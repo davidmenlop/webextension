@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Preparar Entorno') {
+            steps {
+                script {
+                    sh 'docker --version'
+                    sh 'docker compose --version'
+                }
+            }
+        }
+        stage('Git pull') {
+            steps {
+                git branch: 'main', credentialsId: 'template-git', url: 'git@github.com:CebraLab/template-nest-project.git'
+            }
+        }
+        stage('Run project') {
+            steps {
+                sh '''
+                    mkdir -p .volumes/redis
+                    chmod 775 .volumes/redis
+                    docker compose up -d --build
+                    sleep 10
+                    docker compose logs
+                    docker compose down
+                '''
+            }
+        }
+    }
+}

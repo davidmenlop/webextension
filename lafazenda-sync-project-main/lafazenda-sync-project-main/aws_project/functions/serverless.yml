@@ -1,0 +1,74 @@
+service: lafazenda-sync-sap-fns
+
+provider:
+  name: aws
+  runtime: python3.11
+  stage: ${self:custom.stage}
+  region: us-east-2
+  versionFunctions: false
+
+  environment:
+    REGION: ${self:provider.region}
+    SQS_URL: ${self:custom.config.${self:custom.stage}.sqs_url}
+
+custom:
+  stage: ${opt:stage, 'dev'}
+
+  config:
+    dev:
+      my_region: ${opt:region, 'us-east-2'}
+      account_id: "159212099090"
+      sqs_url: https://sqs.us-east-2.amazonaws.com/159212099090/lafazenda-sap-hubspot-sync
+      arn_role: "arn:aws:iam::159212099090:role/LaFazendaSyncRole"
+
+    prd:
+      my_region: ${opt:region, 'us-east-1'}
+      account_id: "159212099090"
+      sqs_url: https://sqs.us-east-2.amazonaws.com/159212099090/lafazenda-sap-hubspot-sync
+      arn_role: "arn:aws:iam::159212099090:role/LaFazendaSyncRole"
+
+  pythonRequirements:
+    useDownloadCache: false
+    useStaticCache: true
+    dockerizePip: true
+    cacheLocation: "../cache_python_requirements_plugin"
+    dockerImage: public.ecr.aws/sam/build-python3.11:latest-x86_64
+    fileName: requirements.txt
+
+
+package:
+  individually: true
+
+functions:
+  sendMessage:
+    handler: send_message.lambda_handler
+    role: ${self:custom.config.${self:custom.stage}.arn_role}
+    # events:
+    #   - schedule: cron(30 10 * * ? *)
+    package:
+      patterns:
+        - "!**/*"
+        - "./send_message.py"
+        - "./requirements.py"
+        - "./serverless.yml"
+    tags:
+      author: michael.r
+      env: ${self:custom.stage}
+      project_name: LaFazendaSyncHbSap
+
+  processMessage:
+    handler: process_message.lambda_handler
+    role: ${self:custom.config.${self:custom.stage}.arn_role}
+    package:
+      patterns:
+        - "!**/*"
+        - "./process_message.py"
+        - "./requirements.py"
+        - "./serverless.yml"
+    tags:
+      author: michael.r
+      env: ${self:custom.stage}
+      project_name: LaFazendaSyncHbSap
+
+plugins:
+  - serverless-python-requirements

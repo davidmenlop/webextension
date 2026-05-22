@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>HubSpot Company Search</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="search-row">
+      <input
+        type="text"
+        id="search"
+        placeholder="Buscar empresa o c&oacute;digo..."
+        autofocus
+        autocomplete="off"
+      />
+      <span id="cache-badge" title="Estado del cach&eacute;"></span>
+    </div>
+  </div>
+
+  <div id="loading" class="state-msg">
+    <div class="spinner"></div>
+    <p>Sincronizando empresas...</p>
+  </div>
+
+  <div id="error" class="state-msg hidden"></div>
+  <div id="empty" class="state-msg hidden">Sin resultados</div>
+
+  <div id="results-container">
+    <ul id="results"></ul>
+  </div>
+
+  <script src="../config.js"></script>
+  <script src="../lib/fuzzy-search.js"></script>
+  <script src="../lib/cache.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+version: '3.1'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+    env_file: '.env'
+    volumes:
+      - ./logs/:/app/logs/
+      - ./client/dist/spa/:/app/client/dist/spa/
+    ports:
+      - '${PORT}:${PORT}'
+    networks:
+      - sdk_lafazenda_project_v2_lafazenda_net
+
+networks:
+  sdk_lafazenda_project_v2_lafazenda_net:
+    external: true
