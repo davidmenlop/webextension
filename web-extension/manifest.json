@@ -3,10 +3,10 @@
   "name": "HubSpot Company Search",
   "version": "1.0.0",
   "description": "Busca empresas en HubSpot CRM y aplica filtros por COD_CLIENTE en reportes.",
-  "permissions": ["activeTab", "scripting", "storage", "alarms"],
+  "permissions": ["storage"],
   "host_permissions": [
     "*://app.hubspot.com/*",
-    "https://<BACKEND_URL>/*"
+    "http://localhost:3000/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -18,9 +18,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://app.hubspot.com/reports/*"],
+      "matches": ["*://app.hubspot.com/*"],
       "js": ["config.js", "content/content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true
     }
   ],
   "background": {

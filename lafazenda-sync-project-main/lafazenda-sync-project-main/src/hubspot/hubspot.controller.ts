@@ -9,12 +9,12 @@ export class HubspotController {
     private hubspotService: HubspotService
   ) { }
 
-  @Cron( '*/1 * * * *' )
+  // @Cron( '*/1 * * * *' )
   async updateQueueHubspotPrimaryCompanies () {
     await this.hubspotService.updateQueueHubspotPrimaryCompanies();
   }
 
-  @Cron( '*/1 * * * *' )
+  // @Cron( '*/1 * * * *' )
   async updateQueueHubspotSecondaryCompanies () {
     await this.hubspotService.updateQueueHubspotSecondaryCompanies();
   }

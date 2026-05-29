@@ -9,12 +9,12 @@ export class SapController {
     private readonly sapService: SapService
   ) { }
 
-  @Cron( '*/1 * * * *' )
+  // @Cron( '*/1 * * * *' )
   async queueSapEmpresasPrimarias () {
     await this.sapService.queueSapEmpresasPrimarias();
   }
 
-  @Cron( '*/1 * * * *' )
+  // @Cron( '*/1 * * * *' )
   async queueSapEmpresasSencundarias () {
     await this.sapService.queueSapEmpresasSecundarias();
   }

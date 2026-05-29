@@ -19,8 +19,9 @@ export class WebExtensionController {
   }
 
   @Get( 'companies/all' )
-  async getAllCompanies () {
-    return this.service.getAllCompanies();
+  async getAllCompanies ( @Query( 'max' ) max?: string ) {
+    const maxTotal = max ? parseInt( max, 10 ) : undefined;
+    return this.service.getAllCompanies( isNaN( maxTotal ) ? undefined : maxTotal );
   }
 
   @Get( 'companies/search' )

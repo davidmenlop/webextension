@@ -4,20 +4,8 @@ const resultsContainer = document.getElementById('results-container');
 const loadingEl = document.getElementById('loading');
 const errorEl = document.getElementById('error');
 const emptyEl = document.getElementById('empty');
-const cacheBadge = document.getElementById('cache-badge');
 
-let companies = [];
 let selectedIndex = -1;
-
-function setCacheBadge (state) {
-  cacheBadge.className = state;
-  const titles = {
-    valid: 'Caché sincronizado',
-    invalid: 'Caché expirado — sincronizando...',
-    error: 'Error de sincronización'
-  };
-  cacheBadge.title = titles[state] || '';
-}
 
 function showLoading () {
   loadingEl.classList.remove('hidden');
@@ -47,31 +35,42 @@ function showEmpty () {
   resultsContainer.style.display = 'none';
 }
 
-function sendCodCliente (codCliente) {
+function sendCodCliente (codCliente, name) {
+  console.log('[Popup] sendCodCliente:', codCliente, '|', name);
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (!tabs[0]) return;
+    console.log('[Popup] tabs:', tabs.length);
+    if (!tabs[0]) {
+      console.log('[Popup] No tab activa');
+      return;
+    }
+    console.log('[Popup] Enviando a tab', tabs[0].id);
     chrome.tabs.sendMessage(tabs[0].id, {
       action: 'fillCodCliente',
-      value: codCliente
-    }, () => {
+      codCliente: codCliente,
+      name: name
+    }, (response) => {
+      console.log('[Popup] Respuesta:', response);
       window.close();
     });
   });
 }
 
-function highlightText (text, term) {
-  if (!term) return text;
-  const normText = normalize(text);
-  const normTerm = normalize(term);
-  const idx = normText.indexOf(normTerm);
-  if (idx === -1) return text;
-  const before = text.slice(0, idx);
-  const match = text.slice(idx, idx + normTerm.length);
-  const after = text.slice(idx + normTerm.length);
-  return before + '<span class="highlight">' + match + '</span>' + after;
+function normalize (str) {
+  return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
-function renderResults (results) {
+function highlightText (text, term) {
+  if (!term) return text;
+  var normText = normalize(text);
+  var normTerm = normalize(term);
+  var idx = normText.indexOf(normTerm);
+  if (idx === -1) return text;
+  return text.slice(0, idx) +
+    '<span class="highlight">' + text.slice(idx, idx + normTerm.length) + '</span>' +
+    text.slice(idx + normTerm.length);
+}
+
+function renderResults (results, term) {
   resultsList.innerHTML = '';
   selectedIndex = -1;
 
@@ -80,78 +79,63 @@ function renderResults (results) {
     return;
   }
 
-  showResults();
-
-  const term = searchInput.value.trim();
-
-  results.forEach((company) => {
-    const li = document.createElement('li');
+  results.forEach(function (company) {
+    var li = document.createElement('li');
     li.dataset.codCliente = company.cod_cliente || '';
+    li.dataset.name = company.name || '';
+    li.innerHTML =
+      '<span class="company-name">' + highlightText(company.name, term) + '</span>' +
+      '<span class="company-cod">' + (company.cod_cliente ? 'COD: ' + highlightText(company.cod_cliente, term) : '') + '</span>';
 
-    const codSpan = document.createElement('span');
-    codSpan.className = 'item-cod';
-    codSpan.innerHTML = highlightText(company.cod_cliente || 'Sin codigo', term) || 'Sin codigo';
-
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'item-name';
-    nameSpan.innerHTML = highlightText(company.name || 'Sin nombre', term) || 'Sin nombre';
-
-    li.appendChild(codSpan);
-    li.appendChild(nameSpan);
-    li.addEventListener('click', () => {
-      sendCodCliente(company.cod_cliente || '');
+    li.addEventListener('click', function () {
+      sendCodCliente(company.cod_cliente, company.name);
     });
 
     resultsList.appendChild(li);
   });
+
+  showResults();
 }
 
-function moveSelection (direction) {
-  const items = resultsList.querySelectorAll('li');
-  if (items.length === 0) return;
+var abortController = null;
 
-  items.forEach((li) => li.classList.remove('active'));
+async function doSearch (term) {
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
 
-  if (direction === 'down') {
-    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
-  } else if (direction === 'up') {
-    selectedIndex = Math.max(selectedIndex - 1, 0);
-  }
-
-  const activeItem = items[selectedIndex];
-  if (activeItem) {
-    activeItem.classList.add('active');
-    activeItem.scrollIntoView({ block: 'nearest' });
+  showLoading();
+  try {
+    var url = CONFIG.BACKEND_URL + '/api/v1/web-extension/companies/search?q=' + encodeURIComponent(term);
+    var response = await fetch(url, { signal: abortController.signal });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    renderResults(data.results, term);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('[Search] Error:', err);
+    showError('Error al buscar. Verifica la conexion.');
   }
 }
 
-let debounceTimer = null;
+var debounceTimer = null;
 
-searchInput.addEventListener('input', () => {
-  const term = searchInput.value;
-  if (!term || !term.trim()) {
+searchInput.addEventListener('input', function () {
+  var term = searchInput.value.trim();
+  if (!term) {
     clearTimeout(debounceTimer);
-    if (companies.length > 0) {
-      renderResults(companies.slice(0, CONFIG.MAX_RESULTS));
-    } else {
-      resultsList.innerHTML = '';
-      emptyEl.classList.add('hidden');
-      resultsContainer.style.display = 'none';
-    }
+    if (abortController) abortController.abort();
+    resultsList.innerHTML = '';
+    showEmpty();
     return;
   }
 
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    const results = fuzzySearch(term, companies, {
-      tolerance: CONFIG.FUZZY_TOLERANCE,
-      maxResults: CONFIG.MAX_RESULTS
-    });
-    renderResults(results);
-  }, CONFIG.DEBOUNCE_MS || 150);
+  debounceTimer = setTimeout(function () {
+    doSearch(term);
+  }, CONFIG.DEBOUNCE_MS || 300);
 });
 
-searchInput.addEventListener('keydown', (e) => {
+searchInput.addEventListener('keydown', function (e) {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     moveSelection('down');
@@ -160,43 +144,28 @@ searchInput.addEventListener('keydown', (e) => {
     moveSelection('up');
   } else if (e.key === 'Enter') {
     e.preventDefault();
-    const items = resultsList.querySelectorAll('li');
+    var items = resultsList.querySelectorAll('li');
     if (selectedIndex >= 0 && items[selectedIndex]) {
-      sendCodCliente(items[selectedIndex].dataset.codCliente);
+      sendCodCliente(items[selectedIndex].dataset.codCliente, items[selectedIndex].dataset.name);
     }
   }
 });
 
-async function init () {
-  showLoading();
-  setCacheBadge('invalid');
+function moveSelection (direction) {
+  var items = resultsList.querySelectorAll('li');
+  if (items.length === 0) return;
 
-  const cache = await getCache();
+  items.forEach(function (li) { li.classList.remove('active'); });
 
-  if (cache.valid && cache.companies.length > 0) {
-    companies = cache.companies;
-    setCacheBadge('valid');
-    renderResults(companies.slice(0, CONFIG.MAX_RESULTS));
-    return;
+  if (direction === 'down') {
+    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+  } else if (direction === 'up') {
+    selectedIndex = Math.max(selectedIndex - 1, 0);
   }
 
-  const result = await syncCache();
-
-  if (result.success) {
-    const freshCache = await getCache();
-    companies = freshCache.companies;
-    setCacheBadge('valid');
-    renderResults(companies.slice(0, CONFIG.MAX_RESULTS));
-  } else {
-    if (cache.companies.length > 0) {
-      companies = cache.companies;
-      setCacheBadge('invalid');
-      renderResults(companies.slice(0, CONFIG.MAX_RESULTS));
-    } else {
-      setCacheBadge('error');
-      showError('No se pudo sincronizar. Verifica la conexión.');
-    }
+  var activeItem = items[selectedIndex];
+  if (activeItem) {
+    activeItem.classList.add('active');
+    activeItem.scrollIntoView({ block: 'nearest' });
   }
 }
-
-document.addEventListener('DOMContentLoaded', init);

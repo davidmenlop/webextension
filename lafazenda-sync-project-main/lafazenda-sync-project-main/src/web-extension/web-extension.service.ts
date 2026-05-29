@@ -49,7 +49,7 @@ export class WebExtensionService {
     return { results, paging: response.data.paging };
   }
 
-  async getAllCompanies (): Promise<AllCompaniesResponse> {
+  async getAllCompanies ( maxTotal?: number ): Promise<AllCompaniesResponse> {
     const allCompanies: CompanyResult[] = [];
     let after: string | undefined;
     let pageCount = 0;
@@ -60,6 +60,10 @@ export class WebExtensionService {
       after = paging?.next?.after;
       pageCount++;
       this.logger.debug( `Page ${pageCount}: ${results.length} companies (total so far: ${allCompanies.length})` );
+      if ( maxTotal && allCompanies.length >= maxTotal ) {
+        this.logger.log( `Reached maxTotal limit of ${maxTotal} after ${pageCount} pages` );
+        break;
+      }
     } while ( after );
 
     this.logger.log( `Loaded all ${allCompanies.length} companies in ${pageCount} pages` );
@@ -74,27 +78,49 @@ export class WebExtensionService {
   async searchCompanies ( term: string ): Promise<{ results: CompanyResult[] }> {
     this.logger.debug( `Searching companies with term: "${term}"` );
 
-    const response = await this.apiHbV3.post( '/objects/companies/search', {
-      filterGroups: [
-        {
-          filters: [ { propertyName: 'name', operator: 'CONTAINS_TOKEN', value: term } ]
-        },
-        {
-          filters: [ { propertyName: 'cod_cliente', operator: 'CONTAINS_TOKEN', value: term } ]
+    const searchBy = async ( propertyName: string ) => {
+      try {
+        const response = await this.apiHbV3.post( '/objects/companies/search', {
+          filterGroups: [
+            {
+              filters: [ { propertyName, operator: 'CONTAINS_TOKEN', value: term } ]
+            }
+          ],
+          properties: [ 'name', 'cod_cliente' ],
+          limit: 50
+        });
+        return response.data.results || [];
+      } catch ( err: any ) {
+        if ( err.response?.status === 400 ) {
+          this.logger.debug( `CONTAINS_TOKEN not supported on "${propertyName}" for term "${term}", skipping` );
+          return [];
         }
-      ],
-      properties: [
-        'name',
-        'cod_cliente'
-      ],
-      limit: 50
-    });
+        throw err;
+      }
+    };
 
-    const results: CompanyResult[] = ( response.data.results || [] ).map( ( r: any ) => ({
-      id: r.id,
-      name: r.properties.name || '',
-      cod_cliente: r.properties.cod_cliente || null
-    }) );
+    const searchTasks = [ searchBy( 'name' ) ];
+    if ( /\d/.test( term ) ) {
+      searchTasks.push( searchBy( 'cod_cliente' ) );
+    }
+
+    const allResults = await Promise.all( searchTasks );
+
+    const seen = new Set<string>();
+    const results: CompanyResult[] = [];
+
+    for ( const companyResults of allResults ) {
+      for ( const r of companyResults ) {
+        if ( !seen.has( r.id ) ) {
+          seen.add( r.id );
+          results.push({
+            id: r.id,
+            name: r.properties.name || '',
+            cod_cliente: r.properties.cod_cliente || null
+          });
+        }
+      }
+    }
 
     return { results };
   }

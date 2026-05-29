@@ -36,11 +36,12 @@ async function setCache (companies, total) {
   }
 }
 
-async function syncCache () {
+async function syncCache (maxCompanies = 1000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => controller.abort(), 120000);
   try {
-    const response = await fetch(CONFIG.BACKEND_URL + '/api/v1/web-extension/companies/all', {
+    const url = CONFIG.BACKEND_URL + '/api/v1/web-extension/companies/all?max=' + maxCompanies;
+    const response = await fetch(url, {
       signal: controller.signal
     });
     clearTimeout(timeout);

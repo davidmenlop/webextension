@@ -34,16 +34,26 @@ import { PrimaryCompanyQueue } from './hubspot/models/empresa_primaria_queue.mod
         SecondaryCompanyQueue,
         Negocio,
         DealQueue
-      ]
-    }),
+      ],
+      extra: {
+        connectTimeout: 15000
+      },
+      retryAttempts: 3,
+      retryDelay: 3000
+    } as TypeOrmModuleOptions),
     TypeOrmModule.forRoot({
       ...CONFIG.databases.mysqlfazenda as Partial<TypeOrmModuleOptions>,
       name: 'FAZENDA',
       entities: [
         SAP_HUBSPOT_BPS_2,
         SAP_HUBSPOT_REPORTE_VENTAS
-      ]
-    }),
+      ],
+      extra: {
+        connectTimeout: 15000
+      },
+      retryAttempts: 3,
+      retryDelay: 3000
+    } as TypeOrmModuleOptions),
     // ServeStaticModule.forRoot({
     //   rootPath: join( __dirname, '..', 'client/dist/spa' )
     // }),

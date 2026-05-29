@@ -15,25 +15,22 @@
         autofocus
         autocomplete="off"
       />
-      <span id="cache-badge" title="Estado del cach&eacute;"></span>
     </div>
   </div>
 
-  <div id="loading" class="state-msg">
+  <div id="loading" class="state-msg hidden">
     <div class="spinner"></div>
-    <p>Sincronizando empresas...</p>
+    <p>Buscando...</p>
   </div>
 
   <div id="error" class="state-msg hidden"></div>
-  <div id="empty" class="state-msg hidden">Sin resultados</div>
+  <div id="empty" class="state-msg">Escribe para buscar empresas</div>
 
   <div id="results-container">
     <ul id="results"></ul>
   </div>
 
   <script src="../config.js"></script>
-  <script src="../lib/fuzzy-search.js"></script>
-  <script src="../lib/cache.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
